@@ -1,5 +1,6 @@
 /* Web3 Tools — read-only dashboard. No build step, no keys, no wallet connection.
-   Data: data/funding.json + data/whales.json (verified snapshots, 24 Nov 2026).
+   Data: data/funding.json + data/funds.json + data/airdrops.json + data/whales.json
+   (verified snapshots, 24 Nov 2026).
    Live checks (optional, best-effort, no key): CoinGecko prices, mempool.space
    (BTC balances/fees), ethereum.publicnode.com (ETH balance/gas),
    api.mainnet-beta.solana.com (SOL balance). Any live failure falls back to
@@ -13,6 +14,8 @@ const FETCH_TIMEOUT_MS = 8000;
 
 const state = {
   funding: null, // { snapshot_date, rounds: [], sources: [] }
+  funds: null,   // { snapshot_date, funds: [], sources: [] }
+  airdrops: null, // { snapshot_date, airdrops: [], sources: [] }
   whales: null,  // { snapshot_date, snapshot_prices_usd, wallets: [], sources: [] }
   userWhales: [],
   prices: null,  // { bitcoin, ethereum, solana } in USD, live
@@ -21,6 +24,12 @@ const state = {
   fundingSearch: '',
   fundingRound: 'all',
   fundingSort: 'amount-desc',
+  fundsSearch: '',
+  fundsTier: 'all',
+  fundsFocus: 'all',
+  fundsSort: 'cr-order',
+  airdropSearch: '',
+  airdropStatus: 'all',
   liveBalances: {}, // address -> { value, currency, live: true }
 };
 
@@ -106,11 +115,15 @@ async function rpcCall(url, method, params) {
 /* ---------- data loading ---------- */
 
 async function loadData() {
-  const [funding, whales] = await Promise.all([
+  const [funding, funds, airdrops, whales] = await Promise.all([
     fetchJson('data/funding.json'),
+    fetchJson('data/funds.json'),
+    fetchJson('data/airdrops.json'),
     fetchJson('data/whales.json'),
   ]);
   state.funding = funding;
+  state.funds = funds;
+  state.airdrops = airdrops;
   state.whales = whales;
   try {
     state.userWhales = JSON.parse(localStorage.getItem(USER_WHALES_KEY) || '[]');
@@ -173,9 +186,31 @@ function renderFunding() {
     tr.appendChild(tdR);
     tr.appendChild(el('td', 'amount', fmtMoneyShort(r.amount_usd)));
     tr.appendChild(el('td', null, r.category || '—'));
-    const tdL = el('td', null, r.lead_investor || '—');
-    if (r.investors && r.investors.length > 1) {
-      tdL.appendChild(el('span', 'sub', '+ ' + (r.investors.length - 1) + ' more: ' + r.investors.slice(1).join(', ')));
+    // Investors: full list; names that match a fund in the Funds directory
+    // become links that jump to that fund's entry.
+    const tdL = el('td');
+    const investors = (r.investors && r.investors.length)
+      ? r.investors
+      : (r.lead_investor ? [r.lead_investor] : []);
+    if (investors.length === 0) {
+      tdL.textContent = 'N/A';
+    } else {
+      investors.forEach(function (inv, i) {
+        if (i > 0) tdL.appendChild(document.createTextNode(', '));
+        const fund = fundForInvestor(inv);
+        if (fund) {
+          const a = el('a', 'investor-link', inv);
+          a.href = '#tab-funds';
+          a.title = 'See ' + fund.name + ' in the Funds directory';
+          a.addEventListener('click', function (e) {
+            e.preventDefault();
+            showFund(fund.name);
+          });
+          tdL.appendChild(a);
+        } else {
+          tdL.appendChild(document.createTextNode(inv));
+        }
+      });
     }
     tr.appendChild(tdL);
     const tdS = el('td', null, r.source || '—');
@@ -218,6 +253,227 @@ function initFundingFilters() {
     state.fundingSort = e.target.value;
     renderFunding();
   });
+}
+
+/* ---------- funds ---------- */
+
+/* Match an investor name from a funding round to a fund in the directory.
+   Normalises away legal/form words (Capital, Ventures, Labs, …) so e.g.
+   "Dragonfly Capital" and "Pantera" both match their fund entries. */
+function normalizeFundKey(name) {
+  return String(name || '').toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\b(capital|ventures|labs|partners|partner|fund|frontier)\b/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+
+function fundForInvestor(investorName) {
+  if (!state.funds || !state.funds.funds) return null;
+  const key = normalizeFundKey(investorName);
+  if (!key) return null;
+  return state.funds.funds.find(function (f) { return normalizeFundKey(f.name) === key; }) || null;
+}
+
+/* Jump to the Funds tab showing only the named fund. */
+function showFund(fundName) {
+  document.querySelectorAll('.tab-btn').forEach(function (b) {
+    b.classList.toggle('active', b.dataset.tab === 'funds');
+  });
+  document.querySelectorAll('.tab-panel').forEach(function (p) { p.hidden = true; });
+  $('#tab-funds').hidden = false;
+  state.fundsSearch = fundName;
+  state.fundsTier = 'all';
+  state.fundsFocus = 'all';
+  const searchEl = $('#fundsSearch');
+  if (searchEl) searchEl.value = fundName;
+  const tierSel = $('#fundsTierFilter');
+  if (tierSel) tierSel.value = 'all';
+  const focusSel = $('#fundsFocusFilter');
+  if (focusSel) focusSel.value = 'all';
+  renderFunds();
+  document.querySelector('.container').scrollIntoView();
+}
+
+function fundsRows() {
+  let rows = (state.funds.funds || []).slice();
+  if (state.fundsSearch) {
+    const q = state.fundsSearch.toLowerCase();
+    rows = rows.filter(function (f) {
+      return [f.name, f.focus_area, (f.latest_deal && f.latest_deal.project) || '', f.note || '']
+        .join(' ').toLowerCase().includes(q);
+    });
+  }
+  if (state.fundsTier !== 'all') rows = rows.filter(function (f) { return String(f.tier) === state.fundsTier; });
+  if (state.fundsFocus !== 'all') rows = rows.filter(function (f) { return f.focus_area === state.fundsFocus; });
+  if (state.fundsSort === 'portfolio-desc') rows.sort(function (a, b) { return (b.portfolio || 0) - (a.portfolio || 0); });
+  else if (state.fundsSort === 'roi-desc') rows.sort(function (a, b) { return (b.retail_roi || 0) - (a.retail_roi || 0); });
+  else if (state.fundsSort === 'name-asc') rows.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+  return rows;
+}
+
+function fundInitials(name) {
+  const words = String(name || '').split(/[^A-Za-z0-9]+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[1][0]).toUpperCase();
+}
+
+function fundHue(name) {
+  let h = 0;
+  const s = String(name || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+  return h;
+}
+
+function renderFunds() {
+  const rows = fundsRows();
+  const body = $('#fundsBody');
+  body.innerHTML = '';
+  rows.forEach(function (f) {
+    const tr = document.createElement('tr');
+    // Name with a text-initial mark (own design — no CryptoRank logos).
+    const tdN = el('td');
+    const wrap = el('div', 'fund-name');
+    const av = el('span', 'fund-avatar', fundInitials(f.name));
+    av.style.background = 'hsl(' + fundHue(f.name) + ' 45% 28%)';
+    av.style.color = 'hsl(' + fundHue(f.name) + ' 90% 82%)';
+    wrap.appendChild(av);
+    const nameWrap = el('div');
+    nameWrap.appendChild(el('strong', null, f.name));
+    if (f.note) nameWrap.appendChild(el('span', 'sub', f.note));
+    wrap.appendChild(nameWrap);
+    tdN.appendChild(wrap);
+    tr.appendChild(tdN);
+    // Tier
+    const tdT = el('td');
+    tdT.appendChild(el('span', 'tier-badge', 'Tier ' + f.tier));
+    tr.appendChild(tdT);
+    // Latest deal
+    const tdD = el('td');
+    const d = f.latest_deal || {};
+    if (d.project) {
+      tdD.appendChild(el('strong', null, d.project));
+      tdD.appendChild(el('span', 'sub',
+        (d.amount_usd ? fmtMoneyShort(d.amount_usd) : 'Amount N/A') + (d.date ? ' · ' + fmtDate(d.date) : '')));
+    } else {
+      tdD.textContent = '—';
+    }
+    tr.appendChild(tdD);
+    tr.appendChild(el('td', 'amount', (f.portfolio !== null && f.portfolio !== undefined) ? fmtNum(f.portfolio, 0) : 'N/A'));
+    tr.appendChild(el('td', 'amount', (f.retail_roi !== null && f.retail_roi !== undefined) ? Number(f.retail_roi).toFixed(2) + 'x' : 'N/A'));
+    const tdF = el('td');
+    tdF.appendChild(el('span', 'focus-chip', f.focus_area || 'N/A'));
+    tr.appendChild(tdF);
+    body.appendChild(tr);
+  });
+  $('#fundsEmpty').hidden = rows.length > 0;
+  $('#statFunds').textContent = String((state.funds.funds || []).length);
+  const srcEl = $('#fundsSources');
+  srcEl.innerHTML = '';
+  srcEl.appendChild(el('span', null, 'Snapshot ' + (state.funds.snapshot_date || SNAPSHOT_DATE) + '. ' +
+    (state.funds.snapshot_note || '') + ' Source: '));
+  (state.funds.sources || []).forEach(function (s, i) {
+    if (i > 0) srcEl.appendChild(document.createTextNode(' · '));
+    const a = el('a', null, s.name);
+    a.href = s.url; a.target = '_blank'; a.rel = 'noopener';
+    srcEl.appendChild(a);
+  });
+}
+
+function initFundsFilters() {
+  const tiers = Array.from(new Set((state.funds.funds || []).map(function (f) { return String(f.tier); }))).sort();
+  const tierSel = $('#fundsTierFilter');
+  tiers.forEach(function (t) {
+    const opt = el('option', null, 'Tier ' + t);
+    opt.value = t;
+    tierSel.appendChild(opt);
+  });
+  const focuses = Array.from(new Set((state.funds.funds || []).map(function (f) { return f.focus_area; }))).filter(Boolean).sort();
+  const focusSel = $('#fundsFocusFilter');
+  focuses.forEach(function (fa) {
+    const opt = el('option', null, fa);
+    opt.value = fa;
+    focusSel.appendChild(opt);
+  });
+  $('#fundsSearch').addEventListener('input', function (e) {
+    state.fundsSearch = e.target.value.trim();
+    renderFunds();
+  });
+  tierSel.addEventListener('change', function (e) { state.fundsTier = e.target.value; renderFunds(); });
+  focusSel.addEventListener('change', function (e) { state.fundsFocus = e.target.value; renderFunds(); });
+  $('#fundsSort').addEventListener('change', function (e) { state.fundsSort = e.target.value; renderFunds(); });
+}
+
+/* ---------- airdrops ---------- */
+
+function airdropRows() {
+  let rows = (state.airdrops.airdrops || []).slice();
+  if (state.airdropSearch) {
+    const q = state.airdropSearch.toLowerCase();
+    rows = rows.filter(function (a) {
+      return [a.project, a.status, a.task, a.progress || '', a.note || '']
+        .join(' ').toLowerCase().includes(q);
+    });
+  }
+  if (state.airdropStatus !== 'all') rows = rows.filter(function (a) { return a.status_key === state.airdropStatus; });
+  return rows;
+}
+
+function renderAirdrops() {
+  const rows = airdropRows();
+  const body = $('#airdropBody');
+  body.innerHTML = '';
+  rows.forEach(function (a) {
+    const tr = document.createElement('tr');
+    const tdP = el('td');
+    tdP.appendChild(el('strong', null, a.project));
+    if (a.progress) tdP.appendChild(el('span', 'sub', a.progress));
+    if (a.note) tdP.appendChild(el('span', 'sub', a.note));
+    tr.appendChild(tdP);
+    const tdS = el('td');
+    tdS.appendChild(el('span', 'status-badge status-' + a.status_key, a.status));
+    tr.appendChild(tdS);
+    tr.appendChild(el('td', null, a.deadline || '—'));
+    tr.appendChild(el('td', null, a.task || '—'));
+    const tdL = el('td');
+    if (a.link) {
+      const link = el('a', null, 'Open ↗');
+      link.href = a.link; link.target = '_blank'; link.rel = 'noopener';
+      tdL.appendChild(link);
+    } else {
+      tdL.textContent = '—';
+    }
+    tr.appendChild(tdL);
+    body.appendChild(tr);
+  });
+  $('#airdropEmpty').hidden = rows.length > 0;
+  $('#statAirdrops').textContent = String((state.airdrops.airdrops || []).length);
+  const srcEl = $('#airdropSources');
+  srcEl.innerHTML = '';
+  srcEl.appendChild(el('span', null, 'Snapshot ' + (state.airdrops.snapshot_date || SNAPSHOT_DATE) + '. ' +
+    (state.airdrops.snapshot_note || '') + ' Sources: '));
+  (state.airdrops.sources || []).forEach(function (s, i) {
+    if (i > 0) srcEl.appendChild(document.createTextNode(' · '));
+    const a = el('a', null, s.name);
+    a.href = s.url; a.target = '_blank'; a.rel = 'noopener';
+    srcEl.appendChild(a);
+  });
+}
+
+function initAirdropFilters() {
+  const labels = { active: 'Active — daily', wl: 'WL secured', ended: 'Ended' };
+  const statuses = Array.from(new Set((state.airdrops.airdrops || []).map(function (a) { return a.status_key; })));
+  const sel = $('#airdropStatusFilter');
+  statuses.forEach(function (k) {
+    const opt = el('option', null, labels[k] || k);
+    opt.value = k;
+    sel.appendChild(opt);
+  });
+  $('#airdropSearch').addEventListener('input', function (e) {
+    state.airdropSearch = e.target.value.trim();
+    renderAirdrops();
+  });
+  sel.addEventListener('change', function (e) { state.airdropStatus = e.target.value; renderAirdrops(); });
 }
 
 /* ---------- whales ---------- */
@@ -504,8 +760,12 @@ async function init() {
   }
   initTabs();
   initFundingFilters();
+  initFundsFilters();
+  initAirdropFilters();
   initWhaleFilters();
   renderFunding();
+  renderFunds();
+  renderAirdrops();
   renderWhales();
   renderPrices();
   $('#refreshLiveBtn').addEventListener('click', refreshAllLive);
@@ -524,4 +784,8 @@ window.Web3Tools = {
   fmtMoneyFull: fmtMoneyFull,
   explorerUrl: explorerUrl,
   fundingRounds: fundingRounds,
+  fundsRows: fundsRows,
+  airdropRows: airdropRows,
+  normalizeFundKey: normalizeFundKey,
+  fundForInvestor: fundForInvestor,
 };

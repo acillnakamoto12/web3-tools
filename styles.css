@@ -127,7 +127,7 @@ code {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -232,6 +232,60 @@ label > span { display: block; margin-bottom: 5px; font-size: 0.88rem; font-weig
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* ---------- Funds directory ---------- */
+
+.fund-name { display: flex; align-items: center; gap: 10px; }
+
+.fund-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.tier-badge {
+  display: inline-block;
+  background: #2b2350;
+  color: #b3a5ff;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.focus-chip {
+  display: inline-block;
+  background: var(--bg-soft);
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.investor-link { cursor: pointer; }
+
+/* ---------- Airdrop tracker ---------- */
+
+.status-badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.status-active { background: #0f2f26; color: #3ecf8e; }
+.status-wl { background: #2b2350; color: #b3a5ff; }
+.status-ended { background: #2a3140; color: var(--muted); }
 
 /* ---------- Whale cards ---------- */
 

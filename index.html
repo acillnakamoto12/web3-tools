@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Web3 Tools — Funding tracker, whale watch &amp; live prices</title>
-  <meta name="description" content="Web3 Tools: a free, read-only dashboard to track crypto funding rounds, watch whale wallets (EVM, Bitcoin, Solana) and check live prices and gas — no account, no keys, nothing leaves your browser.">
+  <title>Web3 Tools — Funding, funds, airdrops, whale watch &amp; live prices</title>
+  <meta name="description" content="Web3 Tools: a free, read-only dashboard to track crypto funding rounds, browse a directory of crypto funds, follow Acill's airdrop watchlist, watch whale wallets (EVM, Bitcoin, Solana) and check live prices and gas — no account, no keys, nothing leaves your browser.">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -16,7 +16,7 @@
         </span>
         <div>
           <h1>Web3 Tools</h1>
-          <p class="tagline">Funding tracker · Whale watch · Prices &amp; gas. Read-only, no keys needed.</p>
+          <p class="tagline">Funding tracker · Funds directory · Airdrop tracker · Whale watch · Prices &amp; gas. Read-only, no keys needed.</p>
         </div>
       </div>
       <div class="header-actions">
@@ -25,6 +25,8 @@
     </div>
     <nav class="tabs" aria-label="Tools">
       <button class="tab-btn active" data-tab="funding" type="button">💰 Funding</button>
+      <button class="tab-btn" data-tab="funds" type="button">🏦 Funds</button>
+      <button class="tab-btn" data-tab="airdrops" type="button">🪂 Airdrops</button>
       <button class="tab-btn" data-tab="whales" type="button">🐋 Whale Watch</button>
       <button class="tab-btn" data-tab="prices" type="button">📈 Prices &amp; Gas</button>
     </nav>
@@ -32,12 +34,14 @@
 
   <main class="container">
     <section class="banner" id="snapshotBanner">
-      <p><strong>Snapshot data — 24 Nov 2026.</strong> Funding rounds and whale balances below are verified snapshots, not live data. Use <strong>Refresh live</strong> to re-check balances and prices from public no-key APIs (CoinGecko, mempool.space, public RPCs). If a live check fails, the snapshot value stays and is marked as such.</p>
+      <p><strong>Snapshot data — 24 Nov 2026.</strong> Funding rounds, funds, airdrops and whale balances below are verified snapshots, not live data. Use <strong>Refresh live</strong> to re-check balances and prices from public no-key APIs (CoinGecko, mempool.space, public RPCs). If a live check fails, the snapshot value stays and is marked as such.</p>
     </section>
 
     <section class="stats" aria-label="Overview">
       <div class="stat"><span class="stat-num" id="statFundingTotal">$0</span><span class="stat-label">Disclosed funding (Nov 2026)</span></div>
       <div class="stat"><span class="stat-num" id="statRounds">0</span><span class="stat-label">Funding rounds</span></div>
+      <div class="stat"><span class="stat-num" id="statFunds">0</span><span class="stat-label">Crypto funds tracked</span></div>
+      <div class="stat"><span class="stat-num" id="statAirdrops">0</span><span class="stat-label">Airdrops on watchlist</span></div>
       <div class="stat"><span class="stat-num" id="statWhales">0</span><span class="stat-label">Whale wallets tracked</span></div>
       <div class="stat"><span class="stat-num" id="statBtc">—</span><span class="stat-label">BTC price (live)</span></div>
     </section>
@@ -65,6 +69,58 @@
       </div>
       <p id="fundingEmpty" class="empty-state" hidden>No rounds match your search.</p>
       <p class="sources" id="fundingSources"></p>
+    </section>
+
+    <!-- ============ FUNDS ============ -->
+    <section id="tab-funds" class="tab-panel" hidden aria-label="Crypto funds directory">
+      <div class="toolbar">
+        <input id="fundsSearch" type="search" placeholder="Search fund, focus area, latest deal…" aria-label="Search funds" autocomplete="off">
+        <select id="fundsTierFilter" aria-label="Filter by tier">
+          <option value="all">All tiers</option>
+        </select>
+        <select id="fundsFocusFilter" aria-label="Filter by focus area">
+          <option value="all">All focus areas</option>
+        </select>
+        <select id="fundsSort" aria-label="Sort funds">
+          <option value="cr-order">CryptoRank order</option>
+          <option value="portfolio-desc">Most portfolio</option>
+          <option value="roi-desc">Highest retail ROI</option>
+          <option value="name-asc">Name A–Z</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="fundsTable">
+          <thead>
+            <tr><th>Name</th><th>Tier</th><th>Latest Deal</th><th>Portfolio</th><th>Retail ROI</th><th>Focus Area</th></tr>
+          </thead>
+          <tbody id="fundsBody"></tbody>
+        </table>
+      </div>
+      <p id="fundsEmpty" class="empty-state" hidden>No funds match your search.</p>
+      <p class="sources" id="fundsSources"></p>
+    </section>
+
+    <!-- ============ AIRDROPS ============ -->
+    <section id="tab-airdrops" class="tab-panel" hidden aria-label="Airdrop tracker">
+      <div class="banner">
+        <p><strong>Acill's watchlist.</strong> These are the airdrops Acill works on himself — not a general airdrop directory. Status as of 24 Nov 2026.</p>
+      </div>
+      <div class="toolbar">
+        <input id="airdropSearch" type="search" placeholder="Search project, task…" aria-label="Search airdrops" autocomplete="off">
+        <select id="airdropStatusFilter" aria-label="Filter by status">
+          <option value="all">All statuses</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="airdropTable">
+          <thead>
+            <tr><th>Project</th><th>Status</th><th>Deadline</th><th>Task / Claim</th><th>Link</th></tr>
+          </thead>
+          <tbody id="airdropBody"></tbody>
+        </table>
+      </div>
+      <p id="airdropEmpty" class="empty-state" hidden>No airdrops match your search.</p>
+      <p class="sources" id="airdropSources"></p>
     </section>
 
     <!-- ============ WHALES ============ -->
@@ -104,7 +160,7 @@
   </main>
 
   <footer class="app-footer">
-    <p>Read-only tools. No wallet connection, no signing, no private keys — only public addresses. Data sources are listed under each tool. Snapshot: 24 Nov 2026. See <a href="https://github.com/acillnakamoto12/web3-tools">github.com/acillnakamoto12/web3-tools</a> for the CLI tools and data files.</p>
+    <p>Read-only tools. No wallet connection, no signing, no private keys — only public addresses. Data sources are listed under each tool. Snapshot: 24 Nov 2026. Funds directory data: CryptoRank Funds. See <a href="https://github.com/acillnakamoto12/web3-tools">github.com/acillnakamoto12/web3-tools</a> for the CLI tools and data files.</p>
   </footer>
 
   <div id="modalOverlay" class="modal-overlay" hidden>

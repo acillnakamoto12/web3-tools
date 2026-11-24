@@ -67,6 +67,72 @@ class TestDataFiles(unittest.TestCase):
             if r.get("amount_usd") is not None:
                 self.assertGreater(r["amount_usd"], 0)
 
+    def test_funds_json_valid(self):
+        data = json.loads((ROOT / "data" / "funds.json").read_text())
+        self.assertIn("snapshot_date", data)
+        self.assertGreaterEqual(len(data["funds"]), 10)
+        for f in data["funds"]:
+            for field in ("name", "tier", "latest_deal", "portfolio", "retail_roi", "focus_area", "source"):
+                self.assertIn(field, f, f"{f.get('name')}: missing {field}")
+            self.assertIsInstance(f["tier"], int)
+            self.assertGreaterEqual(f["tier"], 1)
+            self.assertLessEqual(f["tier"], 5)
+            self.assertGreater(f["portfolio"], 0)
+            if f.get("retail_roi") is not None:
+                self.assertGreaterEqual(f["retail_roi"], 0)
+            deal = f["latest_deal"]
+            self.assertIn("project", deal)
+            self.assertRegex(deal["date"], r"^\d{4}-\d{2}-\d{2}$")
+            if deal.get("amount_usd") is not None:
+                self.assertGreater(deal["amount_usd"], 0)
+
+    def test_airdrops_json_valid(self):
+        data = json.loads((ROOT / "data" / "airdrops.json").read_text())
+        self.assertIn("snapshot_date", data)
+        self.assertGreaterEqual(len(data["airdrops"]), 1)
+        for a in data["airdrops"]:
+            for field in ("project", "status", "status_key", "deadline", "task", "link", "source"):
+                self.assertIn(field, a, f"{a.get('project')}: missing {field}")
+            self.assertIn(a["status_key"], ("active", "wl", "ended"))
+            self.assertTrue(a["link"].startswith("http"))
+
+    def test_funds_latest_deals_match_funding(self):
+        """Where a fund's latest deal also appears in funding.json, the
+        disclosed amount must agree (dates may differ: funding.json uses the
+        weekly roundup date, funds.json the CryptoRank deal date)."""
+        funding = json.loads((ROOT / "data" / "funding.json").read_text())
+        by_project = {r["project"]: r for r in funding["rounds"]}
+        funds = json.loads((ROOT / "data" / "funds.json").read_text())
+        checked = 0
+        for f in funds["funds"]:
+            deal = f["latest_deal"]
+            if deal["project"] in by_project and deal.get("amount_usd") is not None:
+                self.assertEqual(deal["amount_usd"], by_project[deal["project"]]["amount_usd"],
+                                 f"{deal['project']}: amount mismatch between funds and funding")
+                checked += 1
+        self.assertGreaterEqual(checked, 5, "expected at least 5 cross-checkable deals")
+
+    def test_investor_names_match_funds(self):
+        """Investor names in funding.json that normalise to a fund name must
+        have that fund in funds.json (same normalisation as app.js)."""
+        def norm(name):
+            name = re.sub(r"[^a-z0-9 ]", " ", name.lower())
+            name = re.sub(r"\b(capital|ventures|labs|partners|partner|fund|frontier)\b", " ", name)
+            return re.sub(r"\s+", " ", name).strip()
+
+        funds = json.loads((ROOT / "data" / "funds.json").read_text())
+        fund_keys = {norm(f["name"]) for f in funds["funds"]}
+        funding = json.loads((ROOT / "data" / "funding.json").read_text())
+        linked = set()
+        for r in funding["rounds"]:
+            for inv in r.get("investors") or []:
+                key = norm(inv)
+                if key in fund_keys:
+                    linked.add(inv)
+        # Known links that must resolve: Dragonfly, Coinbase Ventures,
+        # Pantera, Polychain, Blockchain Capital, Y Combinator.
+        self.assertGreaterEqual(len(linked), 6, f"expected >=6 linked investors, got {sorted(linked)}")
+
     def test_whales_json_valid(self):
         data = json.loads((ROOT / "data" / "whales.json").read_text())
         self.assertIn("snapshot_date", data)

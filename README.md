@@ -1,8 +1,9 @@
 # Web3 Tools
 
-A free, read-only toolbox for Web3: track crypto funding rounds, watch whale
-wallets on **EVM, Bitcoin and Solana**, and check live prices and gas — from
-one static dashboard, plus matching Python CLI tools.
+A free, read-only toolbox for Web3: track crypto funding rounds, browse a
+directory of crypto funds (CryptoRank-style), follow Acill's airdrop
+watchlist, watch whale wallets on **EVM, Bitcoin and Solana**, and check live
+prices and gas — from one static dashboard, plus matching Python CLI tools.
 
 **Live demo:** https://acillnakamoto12.github.io/web3-tools/
 
@@ -13,7 +14,9 @@ one static dashboard, plus matching Python CLI tools.
 
 | Tool | What it does |
 | --- | --- |
-| 💰 **Funding tracker** | Table of crypto funding rounds (project, date, round, amount, lead investor), with search, round filter and sorting. |
+| 💰 **Funding tracker** | Table of crypto funding rounds (project, date, round, amount, lead investor), with search, round filter and sorting. Every round lists **all its investors** — click an investor name that is a fund in the directory to jump to that fund's entry in the Funds tab. |
+| 🏦 **Funds** | Directory of crypto funds, CryptoRank-style: name, tier, latest deal, portfolio size, retail ROI and focus area, with search and tier / focus-area filters. Data is a verified snapshot from [CryptoRank Funds](https://cryptorank.io/funds) (24 Nov 2026); fund marks are text initials — no CryptoRank branding or logos. |
+| 🪂 **Airdrop tracker** | **Acill's personal watchlist** — the airdrops he works on himself (project, status, deadline, task/claim, link), with status filter and search. This is not a general airdrop directory. |
 | 🐋 **Whale watch** | Watchlist of famous public whale wallets (EVM + BTC + SOL) with snapshot balances, explorer links, copy-address, live balance refresh, and add-your-own wallets (stored only in your browser). |
 | 📈 **Prices & gas** | Live BTC / ETH / SOL prices (CoinGecko), Ethereum gas price and Bitcoin fee estimates — all from public no-key APIs, with snapshot fallback. |
 | 🐍 **CLI tools** (`tools/`) | `whale_watch.py` (check any public wallet: balance + recent txs) and `funding.py` (search the funding snapshot from your terminal). |
@@ -27,6 +30,13 @@ Open the [live demo](https://acillnakamoto12.github.io/web3-tools/) (or open
 - **Refresh live** re-checks prices and wallet balances from public APIs.
   If a live check fails (offline, rate-limited), the verified snapshot value
   stays and is labelled as a snapshot.
+- **Funds:** search a fund by name, focus area or latest deal; filter by
+  tier or focus area; sort by portfolio size or retail ROI. Each fund shows
+  its latest deal (project, amount, date).
+- **Funding ↔ Funds:** in the Funding tab, investor names that match a fund
+  in the directory are links — click one to jump to that fund's entry.
+- **Airdrops:** Acill's own watchlist. Filter by status (Active — daily /
+  WL secured / Ended) or search by project or task.
 - **+ Add wallet to watch** saves extra wallets in your browser only.
 
 ## Use the CLI tools
@@ -53,9 +63,20 @@ See [`tools/README.md`](tools/README.md) for all flags.
 
 - **Funding rounds** — `data/funding.json`: 22 rounds announced 2–21 Nov
   2026 (total disclosed ≈ $681.2M), compiled from DefiLlama Raises,
-  crypto.news, WEEX, NAUT and hodl.press. Each entry lists its source; where
-  only the announcement week is known, the weekly roundup date is used and
-  marked with a `date_note`.
+  crypto.news, WEEX, NAUT and hodl.press. Each entry lists its source and
+  all its investors (unknown investors are written as N/A, never guessed);
+  where only the announcement week is known, the weekly roundup date is used
+  and marked with a `date_note`.
+- **Funds** — `data/funds.json`: 12 Tier 1 crypto funds as listed on
+  [CryptoRank Funds](https://cryptorank.io/funds) on 24 Nov 2026 (tier,
+  latest deal, portfolio size, retail ROI, primary focus area). Latest-deal
+  amounts cross-checked against `data/funding.json` where the project
+  appears in both (Variational $110M, Codex $30M, Index Industries $50M,
+  Uranium Digital $16.50M, End Close $3.50M). Focus area shown is the
+  primary tag CryptoRank lists for each fund.
+- **Airdrops** — `data/airdrops.json`: Acill's personal watchlist (Qyro
+  Labs, Darkhorse, vAPI Earn, Zero Guys, Pixelora), status as of 24 Nov
+  2026, from Acill's own verified records. Not a general directory.
 - **Whale wallets** — `data/whales.json`: 10 public wallets (3 EVM, 6 BTC,
   1 SOL). Balances are snapshots from BitInfoCharts' live rich list,
   Arkham, and on-chain incident reports (see the `source` field on each
@@ -66,8 +87,9 @@ See [`tools/README.md`](tools/README.md) for all flags.
   mempool.space API (no key). Live ETH balance/gas: ethereum.publicnode.com
   (no key). Live SOL balance: api.mainnet-beta.solana.com (no key).
 
-To update the snapshot, edit `data/funding.json` / `data/whales.json` and
-update `snapshot_date` — the dashboard and CLI read the same files.
+To update the snapshot, edit `data/funding.json` / `data/funds.json` /
+`data/airdrops.json` / `data/whales.json` and update `snapshot_date` — the
+dashboard and CLI read the same files.
 
 ## Files
 
@@ -75,6 +97,8 @@ update `snapshot_date` — the dashboard and CLI read the same files.
 | --- | --- |
 | `index.html` / `styles.css` / `app.js` | Static dashboard (no build step) |
 | `data/funding.json` | Funding rounds snapshot + sources |
+| `data/funds.json` | Crypto funds directory snapshot + sources |
+| `data/airdrops.json` | Acill's airdrop watchlist snapshot + sources |
 | `data/whales.json` | Whale watchlist snapshot + sources |
 | `tools/whale_watch.py` | CLI: check a public wallet (EVM/BTC/SOL) |
 | `tools/funding.py` | CLI: search the funding snapshot |
