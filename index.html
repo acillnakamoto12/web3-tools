@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web3 Tools — Funding tracker, whale watch &amp; live prices</title>
+  <meta name="description" content="Web3 Tools: a free, read-only dashboard to track crypto funding rounds, watch whale wallets (EVM, Bitcoin, Solana) and check live prices and gas — no account, no keys, nothing leaves your browser.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M8 10.5 12 7l4 3.5"/><path d="M8 13.5 12 17l4-3.5"/></svg>
+        </span>
+        <div>
+          <h1>Web3 Tools</h1>
+          <p class="tagline">Funding tracker · Whale watch · Prices &amp; gas. Read-only, no keys needed.</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="refreshLiveBtn" class="btn btn-primary" type="button" title="Re-check live balances and prices from public no-key APIs">↻ Refresh live</button>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Tools">
+      <button class="tab-btn active" data-tab="funding" type="button">💰 Funding</button>
+      <button class="tab-btn" data-tab="whales" type="button">🐋 Whale Watch</button>
+      <button class="tab-btn" data-tab="prices" type="button">📈 Prices &amp; Gas</button>
+    </nav>
+  </header>
+
+  <main class="container">
+    <section class="banner" id="snapshotBanner">
+      <p><strong>Snapshot data — 24 Nov 2026.</strong> Funding rounds and whale balances below are verified snapshots, not live data. Use <strong>Refresh live</strong> to re-check balances and prices from public no-key APIs (CoinGecko, mempool.space, public RPCs). If a live check fails, the snapshot value stays and is marked as such.</p>
+    </section>
+
+    <section class="stats" aria-label="Overview">
+      <div class="stat"><span class="stat-num" id="statFundingTotal">$0</span><span class="stat-label">Disclosed funding (Nov 2026)</span></div>
+      <div class="stat"><span class="stat-num" id="statRounds">0</span><span class="stat-label">Funding rounds</span></div>
+      <div class="stat"><span class="stat-num" id="statWhales">0</span><span class="stat-label">Whale wallets tracked</span></div>
+      <div class="stat"><span class="stat-num" id="statBtc">—</span><span class="stat-label">BTC price (live)</span></div>
+    </section>
+
+    <!-- ============ FUNDING ============ -->
+    <section id="tab-funding" class="tab-panel" aria-label="Funding tracker">
+      <div class="toolbar">
+        <input id="fundingSearch" type="search" placeholder="Search project, investor, category…" aria-label="Search funding rounds" autocomplete="off">
+        <select id="fundingRoundFilter" aria-label="Filter by round type">
+          <option value="all">All round types</option>
+        </select>
+        <select id="fundingSort" aria-label="Sort funding rounds">
+          <option value="amount-desc">Biggest first</option>
+          <option value="date-desc">Newest first</option>
+          <option value="date-asc">Oldest first</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table" id="fundingTable">
+          <thead>
+            <tr><th>Project</th><th>Date</th><th>Round</th><th>Amount</th><th>Category</th><th>Lead investor</th><th>Notes</th></tr>
+          </thead>
+          <tbody id="fundingBody"></tbody>
+        </table>
+      </div>
+      <p id="fundingEmpty" class="empty-state" hidden>No rounds match your search.</p>
+      <p class="sources" id="fundingSources"></p>
+    </section>
+
+    <!-- ============ WHALES ============ -->
+    <section id="tab-whales" class="tab-panel" hidden aria-label="Whale wallet tracker">
+      <div class="toolbar">
+        <div class="filters" role="group" aria-label="Filter by chain">
+          <button class="filter-btn active" data-chain="all" type="button">All chains</button>
+          <button class="filter-btn" data-chain="evm" type="button">EVM</button>
+          <button class="filter-btn" data-chain="btc" type="button">Bitcoin</button>
+          <button class="filter-btn" data-chain="sol" type="button">Solana</button>
+        </div>
+        <button id="addWhaleBtn" class="btn btn-ghost" type="button">+ Add wallet to watch</button>
+        <span class="live-status" id="whaleLiveStatus">Balances: snapshot (24 Nov 2026)</span>
+      </div>
+      <div id="whaleList" class="whale-list" aria-live="polite"></div>
+      <p id="whaleEmpty" class="empty-state" hidden>No wallets on this chain yet.</p>
+      <p class="sources" id="whaleSources"></p>
+    </section>
+
+    <!-- ============ PRICES & GAS ============ -->
+    <section id="tab-prices" class="tab-panel" hidden aria-label="Prices and gas">
+      <div class="price-grid" id="priceGrid"></div>
+      <div class="gas-grid">
+        <div class="gas-card">
+          <h3>Ethereum gas <span class="live-status" id="ethGasStatus">snapshot</span></h3>
+          <p class="big-num" id="ethGas">—</p>
+          <p class="muted" id="ethGasNote">Source: public RPC eth_gasPrice (ethereum.publicnode.com), no key. Falls back to the snapshot note below.</p>
+        </div>
+        <div class="gas-card">
+          <h3>Bitcoin fees <span class="live-status" id="btcFeeStatus">snapshot</span></h3>
+          <p class="big-num" id="btcFee">—</p>
+          <p class="muted" id="btcFeeNote">Source: mempool.space recommended fees, no key.</p>
+        </div>
+      </div>
+      <p class="sources">Live prices: CoinGecko public API (no key). If the live call fails, the 24 Nov 2026 snapshot price is shown instead. Prices are informational only — not financial advice.</p>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>Read-only tools. No wallet connection, no signing, no private keys — only public addresses. Data sources are listed under each tool. Snapshot: 24 Nov 2026. See <a href="https://github.com/acillnakamoto12/web3-tools">github.com/acillnakamoto12/web3-tools</a> for the CLI tools and data files.</p>
+  </footer>
+
+  <div id="modalOverlay" class="modal-overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h2 id="modalTitle">Add wallet to watch</h2>
+      <form id="whaleForm">
+        <label>
+          <span>Chain *</span>
+          <select id="fieldChain">
+            <option value="evm">EVM (Ethereum, etc.)</option>
+            <option value="btc">Bitcoin</option>
+            <option value="sol">Solana</option>
+          </select>
+        </label>
+        <label>
+          <span>Label *</span>
+          <input id="fieldLabel" type="text" required maxlength="60" placeholder="e.g. My favourite whale" autocomplete="off">
+        </label>
+        <label>
+          <span>Wallet address *</span>
+          <input id="fieldAddress" type="text" required maxlength="100" placeholder="0x… / bc1… / base58…" autocomplete="off">
+        </label>
+        <p class="form-error" id="whaleFormError" hidden></p>
+        <div class="modal-actions">
+          <button type="button" id="cancelWhaleBtn" class="btn btn-ghost">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add wallet</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
